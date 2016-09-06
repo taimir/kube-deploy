@@ -37,7 +37,8 @@ kube::multinode::main(){
   fi
 
   LATEST_STABLE_K8S_VERSION=$(curl -sSL "https://storage.googleapis.com/kubernetes-release/release/stable.txt")
-  K8S_VERSION=${K8S_VERSION:-${LATEST_STABLE_K8S_VERSION}}
+  K8S_VERSION="v1.4.0-alpha.3"
+  #${K8S_VERSION:-${LATEST_STABLE_K8S_VERSION}}
 
   CURRENT_PLATFORM=$(kube::helpers::host_platform)
   ARCH=${ARCH:-${CURRENT_PLATFORM##*/}}
@@ -60,7 +61,7 @@ kube::multinode::main(){
 
   TIMEOUT_FOR_SERVICES=${TIMEOUT_FOR_SERVICES:-20}
   USE_CNI=${USE_CNI:-"false"}
-  USE_CONTAINERIZED=${USE_CONTAINERIZED:-"false"}
+  USE_CONTAINERIZED=${USE_CONTAINERIZED:-"true"}
   CNI_ARGS=""
 
   BOOTSTRAP_DOCKER_SOCK="unix:///var/run/docker-bootstrap.sock"
@@ -95,7 +96,7 @@ kube::multinode::main(){
     ETCD_NET_PARAM="-p 2379:2379 -p 2380:2380 -p 4001:4001"
     CNI_ARGS="\
       --network-plugin=cni \
-      --network-plugin-dir=/etc/cni/net.d"
+      --network-plugin-dir=/rootfs/etc/kubernetes/cni/net.d"
   fi
 }
 
@@ -208,7 +209,7 @@ kube::multinode::start_k8s_master() {
     --restart=${RESTART_POLICY} \
     --name kube_kubelet_$(kube::helpers::small_sha) \
     ${KUBELET_MOUNTS} \
-    gcr.io/google_containers/hyperkube-${ARCH}:${K8S_VERSION} \
+    taimir93/hyperkube-amd64:v1.4.0 \
     /hyperkube kubelet \
       --allow-privileged \
       --api-servers=http://localhost:8080 \
@@ -218,7 +219,7 @@ kube::multinode::start_k8s_master() {
       ${CNI_ARGS} \
       ${CONTAINERIZED_FLAG} \
       --hostname-override=${IP_ADDRESS} \
-      --v=2
+      --v=4
 }
 
 # Start kubelet in a container, for a worker node
@@ -236,7 +237,7 @@ kube::multinode::start_k8s_worker() {
     --restart=${RESTART_POLICY} \
     --name kube_kubelet_$(kube::helpers::small_sha) \
     ${KUBELET_MOUNTS} \
-    gcr.io/google_containers/hyperkube-${ARCH}:${K8S_VERSION} \
+    taimir93/hyperkube-amd64:v1.4.0 \
     /hyperkube kubelet \
       --allow-privileged \
       --api-servers=http://${MASTER_IP}:8080 \
@@ -245,7 +246,7 @@ kube::multinode::start_k8s_worker() {
       ${CNI_ARGS} \
       ${CONTAINERIZED_FLAG} \
       --hostname-override=${IP_ADDRESS} \
-      --v=2
+      --v=4
 }
 
 # Start kube-proxy in a container, for a worker node
@@ -260,7 +261,7 @@ kube::multinode::start_k8s_worker_proxy() {
     gcr.io/google_containers/hyperkube-${ARCH}:${K8S_VERSION} \
     /hyperkube proxy \
         --master=http://${MASTER_IP}:8080 \
-        --v=2
+        --v=4
 }
 
 # Turndown the local cluster
@@ -311,7 +312,7 @@ kube::multinode::turndown(){
 
   # Remove cni0 bridge if K8S_VERSION = v1.4.0-alpha.2
   # With versions above that, it's not required. TODO: Remove this later
-  kube::multinode::delete_bridge cni0
+  # kube::multinode::delete_bridge cni0
 }
 
 kube::multinode::delete_bridge() {
